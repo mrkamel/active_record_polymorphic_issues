@@ -29,7 +29,7 @@ end
 ActiveRecord::Base.connection.create_table :shouts do |t|
   t.references :account
   t.string :content_type
-  t.string :content_id
+  t.integer :content_id
 end
 
 ActiveRecord::Base.connection.create_table :text_shouts do |t|
