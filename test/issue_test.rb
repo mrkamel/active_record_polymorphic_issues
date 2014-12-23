@@ -1,11 +1,22 @@
 
-require "bundler/setup"
+begin
+  require "minitest"
+
+  class TestCase < MiniTest::Test; end 
+rescue LoadError
+  require "minitest/unit"
+
+  class TestCase < MiniTest::Unit::TestCase; end 
+end
+
+require "minitest/autorun"
 require "active_record"
 require "logger"
+require "yaml"
 
-puts ActiveRecord::VERSION::STRING
+DATABASE = ENV["DATABASE"] || "sqlite"
 
-ActiveRecord::Base.establish_connection :adapter => "sqlite3", :database => "memory"
+ActiveRecord::Base.establish_connection YAML.load_file(File.expand_path("../database.yml", __FILE__))[DATABASE]
 
 ActiveRecord::Base.connection.execute "DROP TABLE IF EXISTS accounts"
 ActiveRecord::Base.connection.execute "DROP TABLE IF EXISTS shouts"
@@ -48,22 +59,18 @@ class Account < ActiveRecord::Base
   has_many :picture_shouts, :through => :shouts, :source => :content, :source_type => PictureShout
 end
 
-account = Account.create!
+class IssueTest < TestCase
+  def test_issue
+    account = Account.create!
 
-text_shout = TextShout.new(:text => "Hello")
-picture_shout = PictureShout.new(:url => "some url")
+    text_shout = TextShout.new(:text => "Hello")
+    picture_shout = PictureShout.new(:url => "some url")
 
-account.shouts.create!(:content => text_shout)
-account.shouts.create!(:content => picture_shout)
+    account.shouts.create! :content => text_shout
+    account.shouts.create! :content => picture_shout
 
-old_logger = ActiveRecord::Base.logger
-
-begin
-  ActiveRecord::Base.logger = Logger.new(STDOUT)
-
-  puts Account.eager_load(:text_shouts, :picture_shouts).where("picture_shouts.url like '%some%'").inspect
-ensure
-  ActiveRecord::Base.logger = old_logger
+    assert_includes Account.eager_load(:text_shouts, :picture_shouts).where("text_shouts.text like '%Hello%'"), account
+    assert_includes Account.eager_load(:text_shouts, :picture_shouts).where("picture_shouts.url like '%some%'"), account
+  end
 end
-
 
